@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/rs/cors"
 )
 
 type Profile struct {
@@ -32,7 +33,8 @@ func main() {
 	r.HandleFunc("/getProfiles", getProfiles).Methods("GET")
 	r.HandleFunc("/getProfile/{id}", getProfile).Methods("GET")
 	r.HandleFunc("/addProfile", addProfile).Methods("POST")
-	http.Handle("/", r)
+	r.HandleFunc("/updateProfile", updateProfile).Methods("POST")
+	http.Handle("/", cors.Default().Handler(r))
 	log.Fatal(http.ListenAndServe("localhost:8080", nil))
 
 }
@@ -43,6 +45,7 @@ func getProfiles(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	db.Find(&profiles)
 	json.NewEncoder(w).Encode(profiles)
@@ -75,4 +78,30 @@ func addProfile(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&profile)
 
 	db.Create(&profile)
+}
+
+func updateProfile(w http.ResponseWriter, r *http.Request) {
+	db, err := gorm.Open("sqlite3", "db.db")
+
+	var profile Profile
+	_ = json.NewDecoder(r.Body).Decode(&profile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	var finder Profile
+	db.Where("id = ?", profile.Id).First(&finder)
+
+	if finder.Name != profile.Name {
+		db.Model(&finder).Where("id = ?", profile.Id).Update("name", profile.Name)
+	}
+
+	if finder.Bio != profile.Bio {
+		db.Model(&finder).Where("id = ?", profile.Id).Update("bio", profile.Bio)
+	}
+
+	if finder.Birthdate != profile.Birthdate {
+		db.Model(&finder).Where("id = ?", profile.Id).Update("birthdate", profile.Birthdate)
+	}
 }
